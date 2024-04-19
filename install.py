@@ -44,22 +44,24 @@ with open("/usr/local/www/wordpress/wp-config.php", "w") as f:
 # Configure Nginx
 print("Configuring Nginx...")
 nginx_config = """
-server {
-    listen 80;
-    server_name localhost;
+http {
+    server {
+        listen 80;
+        server_name localhost;
 
-    root /usr/local/www/wordpress;
-    index index.php index.html index.htm;
+        root /usr/local/www/wordpress;
+        index index.php index.html index.htm;
 
-    location / {
-        try_files $uri $uri/ /index.php?q=$uri&$args;
-    }
+        location / {
+            try_files $uri $uri/ /index.php?q=$uri&$args;
+        }
 
-    location ~ \.php$ {
-        try_files $uri =404;
-        fastcgi_pass 127.0.0.1:9000;
-        fastcgi_param SCRIPT_FILENAME $request_filename;
-        include fastcgi_params;
+        location ~ \.php$ {
+            try_files $uri =404;
+            fastcgi_pass 127.0.0.1:9000;
+            fastcgi_param SCRIPT_FILENAME $request_filename;
+            include fastcgi_params;
+        }
     }
 }
 """
@@ -70,5 +72,9 @@ with open("/usr/local/etc/nginx/nginx.conf", "w") as f:
 print("Enabling PHP in Nginx...")
 subprocess.run(["sysrc", "php_fpm_enable=YES"])
 subprocess.run(["service", "php-fpm", "start"])
+
+# Restart Nginx
+print("Restarting Nginx...")
+subprocess.run(["service", "nginx", "restart"])
 
 print("WordPress is now available at http://localhost/wp-admin/install.php")
