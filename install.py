@@ -4,7 +4,7 @@ import http.server
 import socketserver
 
 # Define the packages to install
-packages = ["nginx", "mysql80-server", "wordpress"]
+packages = ["nginx", "mysql80-server", "wordpress", "php82"]
 
 # Install the packages
 for package in packages:
@@ -15,6 +15,16 @@ for package in packages:
 print("Configuring MySQL...")
 subprocess.run(["sysrc", "mysql_enable=YES"])
 subprocess.run(["service", "mysql-server", "start"])
+
+# Configure PHP
+print("Configuring PHP...")
+subprocess.run(["sysrc", "php_fpm_enable=YES"])
+subprocess.run(["service", "php-fpm", "start"])
+
+# Configure Nginx
+print("Configuring Nginx...")
+subprocess.run(["sysrc", "nginx_enable=YES"])
+subprocess.run(["service", "nginx", "start"])
 
 # Create a setup wizard
 class SetupWizardHandler(http.server.SimpleHTTPRequestHandler):
@@ -71,6 +81,19 @@ class SetupWizardHandler(http.server.SimpleHTTPRequestHandler):
             subprocess.run(["mysql", "-uroot", "-e", f"GRANT ALL PRIVILEGES ON {wordpress_db_name}.* TO '{wordpress_db_user}'@'localhost' IDENTIFIED BY '{wordpress_db_password}';"])
             subprocess.run(["mysql", "-uroot", "-e", "FLUSH PRIVILEGES;"])
 
+            # Configure WordPress
+            wordpress_config = """
+            <?php
+            define('DB_NAME', '{wordpress_db_name}');
+            define('DB_USER', '{wordpress_db_user}');
+            define('DB_PASSWORD', '{wordpress_db_password}');
+            define('DB_HOST', 'localhost');
+            define('DB_CHARSET', 'utf8');
+            define('DB_COLLATE', '');
+          ?>""".format(wordpress_db_name=wordpress_db_name, wordpress_db_user=wordpress_db_user, wordpress_db_password=wordpress_db_password)
+            with open("/usr/local/www/wordpress/wp-config.php", "w") as f:
+                f.write(wordpress_config)
+
             # Configure Nginx
             nginx_config = """
             server {
@@ -94,19 +117,6 @@ class SetupWizardHandler(http.server.SimpleHTTPRequestHandler):
             """
             with open("/usr/local/etc/nginx/nginx.conf", "w") as f:
                 f.write(nginx_config)
-
-            # Configure WordPress
-            wordpress_config = """
-            <?php
-            define('DB_NAME', '{wordpress_db_name}');
-            define('DB_USER', '{wordpress_db_user}');
-            define('DB_PASSWORD', '{wordpress_db_password}');
-            define('DB_HOST', 'localhost');
-            define('DB_CHARSET', 'utf8');
-            define('DB_COLLATE', '');
-           ?>""".format(wordpress_db_name=wordpress_db_name, wordpress_db_user=wordpress_db_user, wordpress_db_password=wordpress_db_password)
-            with open("/usr/local/www/wordpress/wp-config.php", "w") as f:
-                f.write(wordpress_config)
 
             html = """
             <html>
