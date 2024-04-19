@@ -44,11 +44,11 @@ with open("/usr/local/www/wordpress/wp-config.php", "w") as f:
 # Configure Nginx
 print("Configuring Nginx...")
 nginx_config = """
-http {
-    events {
-        worker_connections 1024;
-    }
+events {
+    worker_connections 1024;
+}
 
+http {
     server {
         listen 80;
         server_name localhost;
