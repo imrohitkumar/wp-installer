@@ -8,10 +8,14 @@ packages = ["nginx", "php74", "mysql80-server", "wordpress"]
 nginx_conf = "/usr/local/etc/nginx/nginx.conf"
 wordpress_conf = "/usr/local/www/wordpress/wp-config.php"
 
+# Create the configuration files
+open(nginx_conf, "w").close()
+open(wordpress_conf, "w").close()
+
 # Install the required packages
 print("Installing required packages...")
 for package in packages:
-    subprocess.run(["pkg", "install", "-y", package])
+    subprocess.run(["pkg", "install", "-y", package], check=True)
 
 # Configure Nginx
 print("Configuring Nginx...")
@@ -70,15 +74,15 @@ require_once(ABSPATH. 'wp-settings.php');
 
 # Create the WordPress database
 print("Creating WordPress database...")
-subprocess.run(["mysql", "-uroot", "-e", "CREATE DATABASE wordpress;"])
+subprocess.run(["mysql", "-uroot", "-e", "CREATE DATABASE wordpress;"], check=True)
 
 # Create the WordPress user
 print("Creating WordPress user...")
-subprocess.run(["mysql", "-uroot", "-e", "GRANT ALL PRIVILEGES ON wordpress.* TO wordpress@localhost IDENTIFIED BY 'wordpress';"])
+subprocess.run(["mysql", "-uroot", "-e", "GRANT ALL PRIVILEGES ON wordpress.* TO wordpress@localhost IDENTIFIED BY 'wordpress';"], check=True)
 
 # Start Nginx and PHP-FPM
 print("Starting Nginx and PHP-FPM...")
-subprocess.run(["service", "nginx", "start"])
-subprocess.run(["service", "php-fpm", "start"])
+subprocess.run(["service", "nginx", "start"], check=True)
+subprocess.run(["service", "php-fpm", "start"], check=True)
 
 print("WordPress is now available at http://localhost/")
