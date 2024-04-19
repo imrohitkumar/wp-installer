@@ -36,7 +36,9 @@ define('DB_PASSWORD', '{wordpress_db_password}');
 define('DB_HOST', 'localhost');
 define('DB_CHARSET', 'utf8');
 define('DB_COLLATE', '');
-define('WP_CONTENT_DIR', '/usr/local/www/wordpress/wp-content');
+define('WP_CONTENT_DIR', '/usr/local/www/wordpress');
+define('WP_PLUGIN_DIR', '/usr/local/www/wordpress/wp-content/plugins');
+define('WP_UPLOADS_DIR', '/usr/local/www/wordpress/wp-content/uploads');
 ?>
 """.format(wordpress_db_name=wordpress_db_name, wordpress_db_user=wordpress_db_user, wordpress_db_password=wordpress_db_password)
 with open("/usr/local/www/wordpress/wp-config.php", "w") as f:
