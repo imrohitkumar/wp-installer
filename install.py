@@ -45,6 +45,10 @@ with open("/usr/local/www/wordpress/wp-config.php", "w") as f:
 print("Configuring Nginx...")
 nginx_config = """
 http {
+    events {
+        worker_connections 1024;
+    }
+
     server {
         listen 80;
         server_name localhost;
@@ -73,8 +77,12 @@ print("Enabling PHP in Nginx...")
 subprocess.run(["sysrc", "php_fpm_enable=YES"])
 subprocess.run(["service", "php-fpm", "start"])
 
-# Restart Nginx
-print("Restarting Nginx...")
-subprocess.run(["service", "nginx", "restart"])
+# Enable Nginx
+print("Enabling Nginx...")
+subprocess.run(["sysrc", "nginx_enable=YES"])
+
+# Start Nginx
+print("Starting Nginx...")
+subprocess.run(["service", "nginx", "start"])
 
 print("WordPress is now available at http://localhost/wp-admin/install.php")
