@@ -1,7 +1,10 @@
 import subprocess
+import os
+import tarfile
+import shutil
 
 # Define the packages to install
-packages = ["nginx", "mysql80-server", "wordpress", "php82"]
+packages = ["nginx", "mysql80-server", "php82"]
 
 # Install the packages
 for package in packages:
@@ -25,9 +28,25 @@ subprocess.run(["mysql", "-uroot", "-e", f"CREATE DATABASE {wordpress_db_name};"
 subprocess.run(["mysql", "-uroot", "-e", f"GRANT ALL PRIVILEGES ON {wordpress_db_name}.* TO '{wordpress_db_user}'@'localhost' IDENTIFIED BY '{wordpress_db_password}';"])
 subprocess.run(["mysql", "-uroot", "-e", "FLUSH PRIVILEGES;"])
 
+# Download and extract WordPress installation archive
+print("Downloading and extracting WordPress installation archive...")
+wordpress_archive_url = "https://wordpress.org/latest.tar.gz"
+wordpress_archive_file = "/tmp/wordpress.tar.gz"
+subprocess.run(["fetch", "-o", wordpress_archive_file, wordpress_archive_url])
+with tarfile.TarFile(wordpress_archive_file, 'r:gz') as tar:
+    tar.extractall(path='/tmp/')
+
+# Move WordPress installation to /usr/local/www/
+print("Moving WordPress installation to /usr/local/www/...")
+shutil.move('/tmp/wordpress', '/usr/local/www/wordpress')
+
+# Set permissions for WordPress installation
+print("Setting permissions for WordPress installation...")
+subprocess.run(["chown", "-R", "www:www", "/usr/local/www/wordpress"])
+
 # Configure WordPress
 print("Configuring WordPress...")
-wordpress_config = f"""
+wordpress_config = """
 <?php
 define('DB_NAME', '{wordpress_db_name}');
 define('DB_USER', '{wordpress_db_user}');
@@ -39,7 +58,7 @@ define('WP_CONTENT_DIR', 'wp-content');
 define('WP_PLUGIN_DIR', 'wp-content/plugins');
 define('WP_UPLOADS_DIR', 'wp-content/uploads');
 ?>
-"""
+""".format(wordpress_db_name=wordpress_db_name, wordpress_db_user=wordpress_db_user, wordpress_db_password=wordpress_db_password)
 with open("/usr/local/www/wordpress/wp-config.php", "w") as f:
     f.write(wordpress_config)
 
@@ -59,25 +78,24 @@ http {
         index index.php index.html index.htm;
 
         location / {
-            try_files $uri $uri/ /index.php?$args;
+            try_files $uri $uri/ /index.php?q=$uri&$args;
         }
 
         location ~ \.php$ {
+            try_files $uri =404;
+            fastcgi_pass 127.0.0.1:9000;
+            fastcgi_param SCRIPT_FILENAME $request_filename;
             include fastcgi_params;
-            fastcgi_pass unix:/var/run/php-fpm.sock;
-            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-            fastcgi_param SCRIPT_NAME $fastcgi_script_name;
-        }
-
-        location ~* \.(js|css|png|jpg|jpeg|gif|ico)$ {
-            expires max;
-            log_not_found off;
         }
     }
 }
 """
 with open("/usr/local/etc/nginx/nginx.conf", "w") as f:
     f.write(nginx_config)
+
+# Set permissions for Nginx configuration
+print("Setting permissions for Nginx configuration...")
+subprocess.run(["chown", "root:wheel", "/usr/local/etc/nginx/nginx.conf"])
 
 # Enable PHP in Nginx
 print("Enabling PHP in Nginx...")
