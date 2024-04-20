@@ -69,6 +69,11 @@ server {
     }
 }
 """
+
+# Create the conf.d directory if it doesn't exist
+if not os.path.exists("/usr/local/etc/nginx/conf.d/"):
+    os.makedirs("/usr/local/etc/nginx/conf.d/")
+
 with open("/usr/local/etc/nginx/conf.d/wordpress.conf", "w") as f:
     f.write(nginx_config)
 
