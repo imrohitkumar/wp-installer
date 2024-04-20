@@ -33,7 +33,7 @@ print("Downloading and extracting WordPress installation archive...")
 wordpress_archive_url = "https://wordpress.org/latest.tar.gz"
 wordpress_archive_file = "/tmp/wordpress.tar.gz"
 subprocess.run(["fetch", "-o", wordpress_archive_file, wordpress_archive_url])
-with tarfile.TarFile(wordpress_archive_file, 'r:gz') as tar:
+with tarfile.open(wordpress_archive_file, 'r:gz') as tar:
     tar.extractall(path='/tmp/')
 
 # Move WordPress installation to /usr/local/www/
