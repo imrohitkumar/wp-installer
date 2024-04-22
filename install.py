@@ -1,7 +1,7 @@
 import subprocess
 
 # Define the packages to install
-packages = ["nginx", "mysql80-server", "wordpress", "php74"]
+packages = ["nginx", "mysql80-server", "wordpress", "php82"]
 
 # Install the packages
 for package in packages:
@@ -43,11 +43,6 @@ define('WP_UPLOADS_DIR', 'wp-content/uploads');
 with open("/usr/local/www/wordpress/wp-config.php", "w") as f:
     f.write(wordpress_config)
 
-# Set permissions for WordPress directory
-print("Setting permissions for WordPress directory...")
-subprocess.run(["chown", "-R", "www:www", "/usr/local/www/wordpress"])
-subprocess.run(["chmod", "-R", "755", "/usr/local/www/wordpress"])
-
 # Configure Nginx
 print("Configuring Nginx...")
 nginx_config = """
@@ -69,7 +64,7 @@ http {
 
         location ~ \.php$ {
             try_files $uri =404;
-            fastcgi_pass unix:/var/run/php-fpm.sock;
+            fastcgi_pass 127.0.0.1:9000;
             fastcgi_param SCRIPT_FILENAME $request_filename;
             include fastcgi_params;
         }
