@@ -1,88 +1,90 @@
-import os
 import subprocess
 
-def install_apache():
-    # Install Apache
-    subprocess.run(["pkg", "install", "apache24"], check=True)
-    
-    # Enable and start Apache service
-    subprocess.run(["sysrc", "apache24_enable=YES"], check=True)
-    subprocess.run(["service", "apache24", "start"], check=True)
-    subprocess.run(["service", "apache24", "status"], check=True)
+# Define the packages to install
+packages = ["nginx", "mysql80-server", "wordpress", "php82"]
 
-def install_php():
-    # Install PHP and related packages
-    subprocess.run(["pkg", "install", "php82", "php82-mysqli", "mod_php82"], check=True)
-    
-    # Copy php.ini and rehash
-    subprocess.run(["cp", "/usr/local/etc/php.ini-production", "/usr/local/etc/php.ini"], check=True)
-    subprocess.run(["rehash"], check=True)
-    
-    # Create mod_php.conf file
-    with open("/usr/local/etc/apache24/modules.d/001_mod-php.conf", "w") as file:
-        file.write("<IfModule dir_module>\n")
-        file.write("    DirectoryIndex index.php index.html\n")
-        file.write("    <FilesMatch \\.php$>\n")
-        file.write("        SetHandler application/x-httpd-php\n")
-        file.write("    </FilesMatch>\n")
-        file.write("    <FilesMatch \\.phps$>\n")
-        file.write("        SetHandler application/x-httpd-php-source\n")
-        file.write("    </FilesMatch>\n")
-        file.write("</IfModule>\n")
-    
-    # Restart Apache
-    subprocess.run(["apachectl", "restart"], check=True)
-    
-    # Test PHP by creating index.php file
-    os.remove("/usr/local/www/apache24/data/index.html")
-    with open("/usr/local/www/apache24/data/index.php", "w") as file:
-        file.write("<?php phpinfo(); ?>")
+# Install the packages
+for package in packages:
+    print(f"Installing {package}...")
+    subprocess.run(["pkg", "install", "-y", package])
 
-def install_mysql():
-    # Install MySQL server
-    subprocess.run(["pkg", "install", "mysql80-server"], check=True)
-    
-    # Enable and start MySQL service
-    subprocess.run(["sysrc", "mysql_enable=YES"], check=True)
-    subprocess.run(["service", "mysql-server", "start"], check=True)
-    
-    # Run mysql_secure_installation
-    subprocess.run(["mysql_secure_installation"], check=True)
+# Configure MySQL
+print("Configuring MySQL...")
+subprocess.run(["sysrc", "mysql_enable=YES"])
+subprocess.run(["service", "mysql-server", "start"])
 
-def setup_https_and_virtualhosts():
-    # Enable mod_ssl in httpd.conf
-    with open("/usr/local/etc/apache24/httpd.conf", "a") as file:
-        file.write("LoadModule ssl_module libexec/apache24/mod_ssl.so\n")
-    
-    # Include httpd-ssl.conf
-    with open("/usr/local/etc/apache24/httpd.conf", "a") as file:
-        file.write("Include etc/apache24/extra/httpd-ssl.conf\n")
-    
-    # Generate self-signed certificate
-    subprocess.run(["openssl", "req", "-x509", "-nodes", "-newkey", "rsa:2048", "-keyout", "/usr/local/etc/apache24/server.key", "-out", "/usr/local/etc/apache24/server.crt", "-days", "365"], check=True)
+# Get database credentials from user
+mysql_root_password = input("Enter MySQL root password: ")
+wordpress_db_name = input("Enter WordPress database name: ")
+wordpress_db_user = input("Enter WordPress database user: ")
+wordpress_db_password = input("Enter WordPress database password: ")
 
-def test_setup_with_wordpress():
-    # Change to apache data directory
-    os.chdir("/usr/local/www/apache24/data")
-    
-    # Remove index.html and download Wordpress
-    os.remove("index.html")
-    subprocess.run(["wget", "https://wordpress.org/latest.tar.gz"], check=True)
-    
-    # Extract and move Wordpress files
-    subprocess.run(["tar", "xzf", "latest.tar.gz"], check=True)
-    subprocess.run(["mv", "wordpress/*", "."], check=True)
-    
-    # Change ownership of files
-    subprocess.run(["chown", "-R", "www:www", "*"], check=True)
-    
-    # Create MySQL database and user for Wordpress
-    subprocess.run(["mysql", "-u", "root", "-p"], input="create database wordpress;\ncreate user 'wordpress'@'localhost' identified by 'password';\ngrant all privileges on wordpress.* to 'wordpress'@'localhost';\nflush privileges;\n", check=True)
+# Configure MySQL database
+print("Configuring MySQL database...")
+subprocess.run(["mysql", "-uroot", "-e", f"CREATE DATABASE {wordpress_db_name};"])
+subprocess.run(["mysql", "-uroot", "-e", f"GRANT ALL PRIVILEGES ON {wordpress_db_name}.* TO '{wordpress_db_user}'@'localhost' IDENTIFIED BY '{wordpress_db_password}';"])
+subprocess.run(["mysql", "-uroot", "-e", "FLUSH PRIVILEGES;"])
 
-if __name__ == "__main__":
-    install_apache()
-    install_php()
-    install_mysql()
-    setup_https_and_virtualhosts()
-    test_setup_with_wordpress()
-    print("FAMP stack installation and setup completed successfully.")
+# Configure WordPress
+print("Configuring WordPress...")
+wordpress_config = f"""
+<?php
+define('DB_NAME', '{wordpress_db_name}');
+define('DB_USER', '{wordpress_db_user}');
+define('DB_PASSWORD', '{wordpress_db_password}');
+define('DB_HOST', 'localhost');
+define('DB_CHARSET', 'utf8');
+define('DB_COLLATE', '');
+define('WP_CONTENT_DIR', 'wp-content');
+define('WP_PLUGIN_DIR', 'wp-content/plugins');
+define('WP_UPLOADS_DIR', 'wp-content/uploads');
+?>
+"""
+with open("/usr/local/www/wordpress/wp-config.php", "w") as f:
+    f.write(wordpress_config)
+
+# Configure Nginx
+print("Configuring Nginx...")
+nginx_config = """
+events {
+    worker_connections 1024;
+}
+
+http {
+    server {
+        listen 80;
+        server_name localhost;
+
+        root /usr/local/www/wordpress;
+        index index.php index.html index.htm;
+
+        location / {
+            try_files $uri $uri/ /index.php?q=$uri&$args;
+        }
+
+        location ~ \.php$ {
+            try_files $uri =404;
+            fastcgi_pass 127.0.0.1:9000;
+            fastcgi_param SCRIPT_FILENAME $request_filename;
+            include fastcgi_params;
+        }
+    }
+}
+"""
+with open("/usr/local/etc/nginx/nginx.conf", "w") as f:
+    f.write(nginx_config)
+
+# Enable PHP in Nginx
+print("Enabling PHP in Nginx...")
+subprocess.run(["sysrc", "php_fpm_enable=YES"])
+subprocess.run(["service", "php-fpm", "start"])
+
+# Enable Nginx
+print("Enabling Nginx...")
+subprocess.run(["sysrc", "nginx_enable=YES"])
+
+# Start Nginx
+print("Starting Nginx...")
+subprocess.run(["service", "nginx", "start"])
+
+print("WordPress is now available at http://localhost/wp-admin/install.php")
